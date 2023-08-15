@@ -1,0 +1,6 @@
+apache-airflow
+boto3
+botocore
+str2bool
+
+
