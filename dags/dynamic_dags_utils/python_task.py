@@ -9,7 +9,7 @@ from dags.dynamic_dags_utils.abstract_task import AbstractTask
 class PythonTask(AbstractTask):
     """Returns an 'expandable' PythonOperator object."""
 
-    def create(self, **kwargs):
+    def create(**kwargs):
         module = import_module("dags.dynamic_dags_utils." + kwargs["python_module"])
 
         if (
