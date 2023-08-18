@@ -1,5 +1,7 @@
-from abstract_task import AbstractTask
 from airflow.operators.bash import BashOperator
+
+from .abstract_task import AbstractTask
+
 
 class BashTask(AbstractTask):
     def create(**kwargs):

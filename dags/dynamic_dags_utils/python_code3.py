@@ -1,7 +1,7 @@
-import time
-import pandas as pd
 from sklearn.model_selection import train_test_split
+
 from include.helpers import *
+
 
 def main(expand=None, **kwargs):
     data_pd = pd.read_csv('include/data/data-demo.csv')

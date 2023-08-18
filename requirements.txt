@@ -2,5 +2,8 @@ apache-airflow
 boto3
 botocore
 str2bool
-
-
+pandas
+lightgbm
+xgboost
+scikit-learn
+joblib
