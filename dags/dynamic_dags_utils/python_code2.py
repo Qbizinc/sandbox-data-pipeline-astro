@@ -1,9 +1,10 @@
-from include.helpers import *
+import pandas as pd
+from .helpers import lag_pandas
 
 
 def main(expand=None, **kwargs):
     time_var = "quarter"
-    data_pd = pd.read_csv("include/data/data-demo.csv")
+    data_pd = pd.read_csv("dags/data/data-demo.csv")
     for col in ["family", "state", "city"]:
         data_pd[col] = data_pd[col].str.replace("/", "_").str.replace(" ", "_")
 
@@ -15,7 +16,7 @@ def main(expand=None, **kwargs):
     )
 
     # lagged_pd = lag_pandas(data_grp_state_pd, kwargs['grp_vars'], 4)
-    # lagged_pd.to_csv('include/data/tmp/lagged_{}.csv' \
+    # lagged_pd.to_csv('dags/data/tmp/lagged_{}.csv' \
     #                     .format('-'.join(kwargs['grp_vars'])),
     #                     index = False
     #                 )

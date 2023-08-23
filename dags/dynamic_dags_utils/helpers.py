@@ -18,7 +18,7 @@ def lag_pandas(df, grp, n_lags):
     return lagged_pd
 
 def train_model(item, df, grp, model_dict, categories_dict,
-                model_path = 'include/models'):
+                model_path = 'dags/data/models'):
     
     value_list = categories_dict['data'][item]
     tmp_dict = {f'{col}': f'{val}' \
@@ -41,7 +41,7 @@ def train_model(item, df, grp, model_dict, categories_dict,
     return scores
 
 def apply_model(item, df, grp, categories_dict,
-                model_path = 'include/models'):
+                model_path = 'dags/data/models'):
     
     value_list = categories_dict['data'][item]
     state_category = '-'.join(value_list[1:])

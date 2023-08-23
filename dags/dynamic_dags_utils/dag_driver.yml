@@ -1,9 +1,10 @@
 dag_metadata:
   dag_id: my_dynamic_dag
-  params: {"job_id": "model_run",
-          "trainModel": true,
-           "modelDate": true,
-           "postprocessing": true}
+  catchup: false,
+  params: { "job_id": "model_run",
+            "trainModel": true,
+            "modelDate": true,
+            "postprocessing": true}
   # schedule: '@daily'
   default_args:
     owner: 'airflow'
@@ -14,80 +15,80 @@ fe_task_group:
     - task_id: get_data
       operator: 'PythonOperator'
       python_module: "python_code1"
-      python_kwargs: {'data_path': 'include/tmp'}
-      depends_on: []
+      python_kwargs: { 'data_path': 'dags/data/tmp' }
+      depends_on: [ ]
     - task_id: build_lags_state
       operator: 'PythonOperator'
       python_module: "python_code2"
-      python_kwargs: {'grp_vars': ['state', 'family']}
-      depends_on: ["get_data"]
+      python_kwargs: { 'grp_vars': [ 'state', 'family' ] }
+      depends_on: [ "get_data" ]
     - task_id: build_lags_city
       operator: 'PythonOperator'
       python_module: "python_code2"
-      python_kwargs: {'grp_vars': ['city', 'state', 'family']}
-      depends_on: ["get_data"]
+      python_kwargs: { 'grp_vars': [ 'city', 'state', 'family' ] }
+      depends_on: [ "get_data" ]
     - task_id: unify_fe
       operator: 'PythonOperator'
       python_module: "python_code3"
-      python_kwargs: {'test_size': 0.2}
-      depends_on: ["build_lags_state", "build_lags_city"]
+      python_kwargs: { 'test_size': 0.2 }
+      depends_on: [ "build_lags_state", "build_lags_city" ]
 training_task_group:
   name: 'training_task_group'
   tasks:
     - task_id: task_split_train_validation_data
       operator: 'PythonOperator'
       python_module: "python_code3"
-      python_kwargs: {'test_size': 0.3}
-      depends_on: []
+      python_kwargs: { 'test_size': 0.3 }
+      depends_on: [ ]
     - task_id: task_model_split_data
       operator: 'PythonOperator'
       python_module: "python_code4"
-      python_kwargs: {'time_sleep': 5}
-      depends_on: ["task_split_train_validation_data"]
+      python_kwargs: { 'time_sleep': 5 }
+      depends_on: [ "task_split_train_validation_data" ]
     - task_id: task_model_training_baseline
       operator: 'PythonOperator'
       python_module: "python_code5"
-      python_kwargs: {'grp_vars': ['state', 'family'], 'test_size': 0.2}
-      depends_on: ["task_model_split_data"]
+      python_kwargs: { 'grp_vars': [ 'state', 'family' ], 'test_size': 0.2 }
+      depends_on: [ "task_model_split_data" ]
     - task_id: task_model_training_p1
       operator: 'PythonOperator'
       python_module: "python_code5"
-      python_kwargs: {'grp_vars': ['city', 'state', 'family'], 'test_size': 0.2}
-      depends_on: ["task_model_split_data"]
+      python_kwargs: { 'grp_vars': [ 'city', 'state', 'family' ], 'test_size': 0.2 }
+      depends_on: [ "task_model_split_data" ]
     - task_id: task_ensemble_models
       operator: 'PythonOperator'
       python_module: "python_code4"
-      python_kwargs: {'time_sleep': 5}
-      depends_on: ["task_model_training_baseline", "task_model_training_p1"]
+      python_kwargs: { 'time_sleep': 5 }
+      depends_on: [ "task_model_training_baseline", "task_model_training_p1" ]
     - task_id: task_validation_metric
       operator: 'PythonOperator'
       python_module: "python_code6"
-      python_kwargs: {'time_sleep': 5}
-      depends_on: ["task_split_train_validation_data"]
+      python_kwargs: { 'time_sleep': 5 }
+      depends_on: [ "task_split_train_validation_data" ]
 inference_task_group:
   name: 'inference_task_group'
   tasks:
     - task_id: task_model_inference
       operator: 'PythonOperator'
       python_module: "python_code6"
-      python_kwargs: {'time_sleep': 5}
-      depends_on: []
+      python_kwargs: { 'time_sleep': 5 }
+      depends_on: [ ]
     - task_id: task_extend1
       operator: 'PythonOperator'
       python_module: "python_code6"
-      python_kwargs: {'time_sleep': 5}
-      expand: [1, 2, 3]
-      depends_on: []
+      python_kwargs: { 'time_sleep': 5 }
+      expand: [ 1, 2, 3 ]
+      depends_on: [ ]
     - task_id: task_extend2
       operator: 'PythonOperator'
       python_module: "python_code6"
-      python_kwargs: {'time_sleep': 5}
-      expand: [1, 2, 3]
-      depends_on: []
+      python_kwargs: { 'time_sleep': 5 }
+      expand: [ 1, 2, 3 ]
+      depends_on: [ ]
 postprocessing_task_group:
   name: 'postprocessing_task_group'
   tasks:
     - task_id: task_model_inference
       operator: 'BashOperator'
       command: 'echo "Task Nothing"'
-      depends_on: []
+      depends_on: [ ]

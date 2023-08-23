@@ -1,106 +1,62 @@
-from datetime import datetime
+"""
+Dynamic DAG for DS enablement.
 
+This DAG is generated from a YAML file, which is parsed and converted into a DAG.
+
+It expects 4 task groups at the top level:
+    - fe_task_group: Feature Engineering
+    - training_task_group: Model Training
+    - inference_task_group: Model Inference
+    - postprocessing_task_group: Postprocessing
+
+This is deliberate to force the developers into structure that will be consistent
+across all DAGs owned by DS.
+
+The DAG takes a boolean parameter, trainModel, which determines whether to run the
+training task group or not.
+"""
 import yaml
 from airflow import DAG
 from airflow.operators.empty import EmptyOperator
 from airflow.operators.python import BranchPythonOperator
-from airflow.utils.task_group import TaskGroup
-from airflow.utils.trigger_rule import TriggerRule
-
-from dynamic_dags_utils.factory import Creator
+from dynamic_dags_utils.utils import build_tasks
 
 # Parse YAML content
-with open("include/dag_driver.yml", "r", encoding="utf-8") as fh:
+with open("dags/dynamic_dags_utils/dag_driver.yml", "r", encoding="utf-8") as fh:
     dag_info = yaml.safe_load(fh)
 
+metadata = dag_info.pop("dag_metadata")
+metadata["catchup"] = False
 
-with DAG(
-    dag_id=dag_info["dag_metadata"]["dag_id"],
-    start_date=datetime.now(),
-    params=dag_info["dag_metadata"]["params"],
-    catchup=False,  # Set to False if you don't want historical backfill
-) as dag:
+with DAG(**metadata) as dag:
     dag_start = EmptyOperator(task_id="start", dag=dag)
+    dag_end = EmptyOperator(task_id="end", dag=dag)
 
-    with TaskGroup(group_id="fe_tasks") as fe_tasks:
-        for task in dag_info["fe_task_group"]["tasks"]:
-            obj = Creator.create_object(**task)
+    build_tasks(dag=dag, task_hierarchy=dag_info)
 
-            if (
-                "depends_on" in task
-                and task["depends_on"] is not None
-                and len(task["depends_on"]) > 0
-            ):
-                for dependency in task["depends_on"]:
-                    # The name of tasks includes the TaskGroup name, seperated with a dot.
-                    dag.get_task("fe_tasks." + dependency) >> obj
-            else:
-                dag_start >> obj
-
-    with TaskGroup(group_id="training_tasks") as training_tasks:
-        training_start = EmptyOperator(task_id="training_start", dag=dag)
-        for task in dag_info["training_task_group"]["tasks"]:
-            obj = Creator.create_object(**task)
-
-            if (
-                "depends_on" in task
-                and task["depends_on"] is not None
-                and len(task["depends_on"]) > 0
-            ):
-                for dependency in task["depends_on"]:
-                    # The name of tasks includes the TaskGroup name, seperated with a dot.
-                    dag.get_task("training_tasks." + dependency) >> obj
-            else:
-                training_start >> obj
-
-    with TaskGroup(group_id="inference_tasks") as inference_tasks:
-        inference_start = EmptyOperator(
-            task_id="inference_start", trigger_rule=TriggerRule.NONE_FAILED
-        )
-        for task in dag_info["inference_task_group"]["tasks"]:
-            obj = Creator.create_object(**task)
-
-            if (
-                "depends_on" in task
-                and task["depends_on"] is not None
-                and len(task["depends_on"]) > 0
-            ):
-                for dependency in task["depends_on"]:
-                    # The name of tasks includes the TaskGroup name, seperated with a dot.
-                    dag.get_task("inference_tasks." + dependency) >> obj
-            else:
-                inference_start >> obj
-
-    with TaskGroup(group_id="postprocessing_tasks") as postprocessing_tasks:
-        postprocessing_start = EmptyOperator(task_id="postprocessing_start")
-        for task in dag_info["inference_task_group"]["tasks"]:
-            obj = Creator.create_object(**task)
-
-            if (
-                "depends_on" in task
-                and task["depends_on"] is not None
-                and len(task["depends_on"]) > 0
-            ):
-                for dependency in task["depends_on"]:
-                    # The name of tasks includes the TaskGroup name, seperated with a dot.
-                    dag.get_task("postprocessing_tasks." + dependency) >> obj
-            else:
-                postprocessing_start >> obj
-
-    # @task.branch
     def run_training(params):
+        """This function is used to determine whether to run the training task group or not."""
         if bool(params["trainModel"]):
             print("Training model...")
-            return ["training_tasks.training_start"]
+            return ["training_task_group.start"]
         print("Model training is skipped.")
-        return ["inference_tasks.inference_start"]
+        return ["inference_task_group.start"]
 
     branching = BranchPythonOperator(
-        task_id="runTraining", python_callable=run_training, op_kwargs=dag.params
+        task_id="runTrainingBranch", python_callable=run_training, op_kwargs=dag.params
     )
 
-    fe_tasks >> branching
-    branching >> training_tasks
-    training_tasks >> inference_tasks
-    branching >> inference_tasks
-    inference_tasks >> postprocessing_tasks
+    dag_start >> dag.task_group_dict["fe_task_group"] >> branching
+    (
+        branching
+        >> dag.task_group_dict["training_task_group"]
+        >> dag.task_group_dict["inference_task_group"]
+        >> dag.task_group_dict["postprocessing_task_group"]
+        >> dag_end
+    )
+    (
+        branching
+        >> dag.task_group_dict["inference_task_group"]
+        >> dag.task_group_dict["postprocessing_task_group"]
+        >> dag_end
+    )

@@ -2,7 +2,7 @@ import pandas as pd
 
 
 def main(**kwargs):
-    data_pd = pd.read_csv("include/data/data-demo.csv")
+    data_pd = pd.read_csv("dags/data/data-demo.csv")
     for col in ["family", "state", "city"]:
         data_pd[col] = data_pd[col].str.replace("/", "_").str.replace(" ", "_")
 
