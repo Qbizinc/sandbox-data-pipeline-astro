@@ -17,8 +17,13 @@ training task group or not.
 """
 import yaml
 from airflow import DAG
+from airflow.decorators import task
+from airflow.models import Variable
 from airflow.operators.empty import EmptyOperator
 from airflow.operators.python import BranchPythonOperator
+
+
+
 from dynamic_dags_utils.utils import build_tasks
 
 # Parse YAML content
@@ -31,6 +36,13 @@ metadata["catchup"] = False
 with DAG(**metadata) as dag:
     dag_start = EmptyOperator(task_id="start", dag=dag)
     dag_end = EmptyOperator(task_id="end", dag=dag)
+
+    @task
+    def get_vars():
+        var_keys = ["source_prefix", "stage_prefix", "target_prefix"]
+        vars_dict = {key: Variable.get(key) for key in var_keys}
+        return vars_dict
+    get_vars_task = get_vars()
 
     build_tasks(dag=dag, task_hierarchy=dag_info)
 
@@ -46,7 +58,7 @@ with DAG(**metadata) as dag:
         task_id="runTrainingBranch", python_callable=run_training, op_kwargs=dag.params
     )
 
-    dag_start >> dag.task_group_dict["fe_task_group"] >> branching
+    dag_start >> get_vars_task >> dag.task_group_dict["fe_task_group"] >> branching
     (
         branching
         >> dag.task_group_dict["training_task_group"]

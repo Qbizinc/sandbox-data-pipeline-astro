@@ -1,8 +1,9 @@
-import pandas as pd
 from .helpers import lag_pandas
 
 
 def main(expand=None, **kwargs):
+    import pandas as pd
+
     time_var = "quarter"
     data_pd = pd.read_csv("dags/data/data-demo.csv")
     for col in ["family", "state", "city"]:
