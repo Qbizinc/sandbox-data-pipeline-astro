@@ -1,37 +1,26 @@
-from tempfile import NamedTemporaryFile
+from dags.dynamic_dags_utils.utils import get_vars_from_file
+from dags.dynamic_dags_utils.utils import stage_in_gcs
 
-from airflow.providers.google.cloud.hooks.gcs import GCSHook
+vars = get_vars_from_file()
 
 
+@stage_in_gcs(
+    source_prefix=vars["source_prefix"],
+    source_files=["product.csv", "lineitem.csv", "order.csv"],
+    target_prefix=vars["stage_prefix"],
+    output_files=["data.csv"],
+    local_path=vars["local_path"],)
 def main(**kwargs):
     import pandas as pd
 
-    def gcs_to_df(bucket, prefix, object_name, gcs_conn_id="sandbox-data-pipeline-gcp"):
-        object_name = f"{prefix}/{object_name}"
-        gcs = GCSHook(gcp_conn_id=gcs_conn_id)
-        with gcs.provide_file(bucket_name=bucket, object_name=object_name) as f:
-            df = pd.read_csv(f)
-        return df
-
-    def df_to_gcs(df, bucket, prefix, object_name, gcs_conn_id="sandbox-data-pipeline-gcp"):
-        object_name = f"{prefix}/{object_name}"
-        gcs = GCSHook(gcp_conn_id=gcs_conn_id)
-        with NamedTemporaryFile("w") as f:
-            df.to_csv(f.name, index=False)
-            gcs.upload(bucket_name=bucket, object_name=object_name, filename=f.name)
-
-
-    vars = kwargs["ti"].xcom_pull(task_ids="get_vars")
-    source_prefix = vars["source_prefix"]
-    stage_prefix = vars["stage_prefix"]
-    bucket = "qbiz-sandbox-data-pipeline"
+    local_path = vars["local_path"]
 
     # Read product catalog
-    product_pd = gcs_to_df(bucket, source_prefix, "product.csv")
+    product_pd = pd.read_csv(f"{local_path}/product.csv")
     product_pd = product_pd[["p_product_id", "department"]].set_index("p_product_id")
 
     # Read transactional table lineitem
-    lineitem_pd = gcs_to_df(bucket, source_prefix, "lineitem.csv")
+    lineitem_pd = pd.read_csv(f"{local_path}/lineitem.csv")
     lineitem_pd = lineitem_pd[["li_order_id", "li_product_id", "quantity"]].set_index(
         "li_product_id"
     )
@@ -40,7 +29,7 @@ def main(**kwargs):
     lineitem_pd = lineitem_pd.join(product_pd, how="inner").set_index("li_order_id")
 
     # Read transactional table order
-    order_pd = gcs_to_df(bucket, source_prefix, "order.csv")
+    order_pd = pd.read_csv(f"{local_path}/order.csv")
     order_pd = order_pd[["o_order_id", "date", "store"]].set_index("o_order_id")
 
     # Join order with lineitem to identify the quantity of each order
@@ -79,5 +68,5 @@ def main(**kwargs):
         .agg({"quantity": "sum"})
     )
 
-    # save data_pd to GCS
-    df_to_gcs(data_pd, bucket, stage_prefix, "data.csv")
+    # save data_pd
+    data_pd.to_csv(f"{local_path}/data.csv", index=False)

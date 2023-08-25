@@ -4,7 +4,7 @@ dag_metadata:
   params: { "job_id": "model_run",
             "trainModel": true,
             "modelDate": true,
-            "postprocessing": true}
+            "postprocessing": true }
   # schedule: '@daily'
   default_args:
     owner: 'airflow'
@@ -19,9 +19,10 @@ fe_task_group:
       depends_on: [ ]
     - task_id: build_lags_state
       operator: 'PythonOperator'
-      python_module: "python_code2"
+      python_module: "build_lags_state"
       python_kwargs: { 'grp_vars': [ 'state', 'family' ] }
       depends_on: [ "get_data" ]
+      expand: [ Tungurahua, Esmeraldas, Pichincha ]
     - task_id: build_lags_city
       operator: 'PythonOperator'
       python_module: "python_code2"
@@ -75,13 +76,13 @@ inference_task_group:
       depends_on: [ ]
     - task_id: task_extend1
       operator: 'PythonOperator'
-      python_module: "python_code6"
+      python_module: "task_extend1"
       python_kwargs: { 'time_sleep': 5 }
       expand: [ 1, 2, 3 ]
       depends_on: [ ]
     - task_id: task_extend2
       operator: 'PythonOperator'
-      python_module: "python_code6"
+      python_module: "task_extend2"
       python_kwargs: { 'time_sleep': 5 }
       expand: [ 1, 2, 3 ]
       depends_on: [ ]
