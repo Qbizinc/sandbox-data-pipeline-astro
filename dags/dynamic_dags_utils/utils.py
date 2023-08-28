@@ -4,6 +4,7 @@ Utility functions for dynamic DAGs.
 import sys
 
 from airflow import DAG
+from airflow.models import Variable
 from airflow.operators.empty import EmptyOperator
 from airflow.providers.google.cloud.hooks.gcs import GCSHook
 from airflow.utils.task_group import TaskGroup
@@ -11,21 +12,17 @@ from airflow.utils.task_group import TaskGroup
 from dags.dynamic_dags_utils.factory import Creator
 
 
-def get_vars_from_file(file_path="/tmp/vars.json"):
-    """ Reads variables from a file. """
-    import json
-
-    with open(file_path, "r") as fh:
-        vars_dict = json.load(fh)
-
+def get_vars():
+    var_keys = ["source_prefix", "stage_prefix", "target_prefix", "local_path"]
+    vars_dict = {key: Variable.get(key) for key in var_keys}
     return vars_dict
 
 
 def stage_in_gcs(gcp_conn_id="sandbox-data-pipeline-gcp",
                  bucket_name="qbiz-sandbox-data-pipeline",
                  source_prefix=None,
-                 target_prefix=None,
-                 local_path="/tmp",
+                 dest_prefix=None,
+                 local_path=None,
                  source_files=None,
                  output_files=None
                  ):
@@ -33,7 +30,7 @@ def stage_in_gcs(gcp_conn_id="sandbox-data-pipeline-gcp",
         gcp_conn_id (str): The connection ID to use when connecting to GCP.
         bucket_name (str): The name of the GCS bucket.
         source_prefix (str): The prefix of the source files in GCS.
-        target_prefix (str): The prefix of the target files in GCS.
+        dest_prefix (str): The prefix of the dest files in GCS (defaults to variable stage_prefix).
         local_path (str): The local path to which files are downloaded.
         source_files (list): The list of source files to download.
         output_files (list): The list of output files to upload.
@@ -44,9 +41,18 @@ def stage_in_gcs(gcp_conn_id="sandbox-data-pipeline-gcp",
     if output_files is None:
         output_files = []
 
+    vars = get_vars()
+    if not source_prefix:
+        source_prefix = vars["source_prefix"]
+    if not dest_prefix:
+        dest_prefix = vars["stage_prefix"]
+    if not local_path:
+        local_path = vars["local_path"]
+
     def inner_decorator(func):
         def wrapper(*args, **kwargs):
             # Download files from GCS
+
             gcs = GCSHook(gcp_conn_id=gcp_conn_id)
             for source_file in source_files:
                 gcs.download(bucket_name=bucket_name,
@@ -59,7 +65,7 @@ def stage_in_gcs(gcp_conn_id="sandbox-data-pipeline-gcp",
             # Upload files to GCS
             for output_file in output_files:
                 gcs.upload(bucket_name=bucket_name,
-                           object_name=target_prefix + "/" + output_file,
+                           object_name=dest_prefix + "/" + output_file,
                            filename=local_path + "/" + output_file)
 
         return wrapper

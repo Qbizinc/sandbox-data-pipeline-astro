@@ -15,12 +15,9 @@ across all DAGs owned by DS.
 The DAG takes a boolean parameter, trainModel, which determines whether to run the
 training task group or not.
 """
-import json
-import os
 
 import yaml
 from airflow import DAG
-from airflow.models import Variable
 from airflow.operators.empty import EmptyOperator
 from airflow.operators.python import BranchPythonOperator
 
@@ -30,36 +27,12 @@ from dynamic_dags_utils.utils import build_tasks
 with open("dags/dynamic_dags_utils/dag_driver.yml", "r", encoding="utf-8") as fh:
     dag_info = yaml.safe_load(fh)
 
-var_keys = ["source_prefix", "stage_prefix", "target_prefix", "local_path"]
-vars_dict = {key: Variable.get(key) for key in var_keys}
-vars_dict_json = json.dumps(vars_dict)
-print(os.getcwd())
-with open("/tmp/vars.json", "w") as fh:
-    fh.write(vars_dict_json)
-
 metadata = dag_info.pop("dag_metadata")
 metadata["catchup"] = False
 
 with DAG(**metadata) as dag:
     dag_start = EmptyOperator(task_id="start", dag=dag)
     dag_end = EmptyOperator(task_id="end", dag=dag)
-
-    #
-    # @task
-    # def get_vars():
-    #     var_keys = ["source_prefix", "stage_prefix", "target_prefix", "local_path"]
-    #     vars_dict = {key: Variable.get(key) for key in var_keys}
-    #
-    #     # We need these variables for use in a decorator (i.e., prior to task instantiation)
-    #     # Reading them from a file at the top level of the task's file prevents us
-    #     # from needed to access the metadata db every time our DAG is parsed
-    #     vars_dict_json = json.dumps(vars_dict)
-    #     with ("dags/data/tmp/vars.json").open("w") as fh:
-    #         fh.write(vars_dict_json)
-    #
-    #     return vars_dict
-
-    # get_vars_task = get_vars()
 
     build_tasks(dag=dag, task_hierarchy=dag_info)
 

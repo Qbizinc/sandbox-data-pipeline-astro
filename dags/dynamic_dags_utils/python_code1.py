@@ -1,19 +1,14 @@
-from dags.dynamic_dags_utils.utils import get_vars_from_file
-from dags.dynamic_dags_utils.utils import stage_in_gcs
-
-vars = get_vars_from_file()
+from dags.dynamic_dags_utils.utils import stage_in_gcs, get_vars
 
 
 @stage_in_gcs(
-    source_prefix=vars["source_prefix"],
     source_files=["product.csv", "lineitem.csv", "order.csv"],
-    target_prefix=vars["stage_prefix"],
-    output_files=["data.csv"],
-    local_path=vars["local_path"],)
+    output_files=["data.csv"], )
 def main(**kwargs):
     import pandas as pd
 
-    local_path = vars["local_path"]
+    vars = get_vars()
+    local_path = vars['local_path']
 
     # Read product catalog
     product_pd = pd.read_csv(f"{local_path}/product.csv")
@@ -22,7 +17,7 @@ def main(**kwargs):
     # Read transactional table lineitem
     lineitem_pd = pd.read_csv(f"{local_path}/lineitem.csv")
     lineitem_pd = lineitem_pd[["li_order_id", "li_product_id", "quantity"]].set_index(
-        "li_product_id"
+        "li_order_id"
     )
 
     # Join lineitem with product to identify the department
