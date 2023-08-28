@@ -17,7 +17,7 @@ def main(**kwargs):
     # Read transactional table lineitem
     lineitem_pd = pd.read_csv(f"{local_path}/lineitem.csv")
     lineitem_pd = lineitem_pd[["li_order_id", "li_product_id", "quantity"]].set_index(
-        "li_order_id"
+        "li_product_id"
     )
 
     # Join lineitem with product to identify the department

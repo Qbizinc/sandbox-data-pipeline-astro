@@ -1,6 +1,7 @@
 """
 Utility functions for dynamic DAGs.
 """
+import os
 import sys
 
 from airflow import DAG
@@ -42,22 +43,19 @@ def stage_in_gcs(gcp_conn_id="sandbox-data-pipeline-gcp",
         output_files = []
 
     vars = get_vars()
-    if not source_prefix:
-        source_prefix = vars["source_prefix"]
-    if not dest_prefix:
-        dest_prefix = vars["stage_prefix"]
-    if not local_path:
-        local_path = vars["local_path"]
+    source_prefix = source_prefix or vars["source_prefix"]
+    dest_prefix = dest_prefix or vars["stage_prefix"]
+    local_path = local_path or vars["local_path"]
 
     def inner_decorator(func):
         def wrapper(*args, **kwargs):
-            # Download files from GCS
 
+            # Download files from GCS
             gcs = GCSHook(gcp_conn_id=gcp_conn_id)
             for source_file in source_files:
                 gcs.download(bucket_name=bucket_name,
-                             object_name=f"{source_prefix}/{source_file}",
-                             filename=local_path + "/" + source_file)
+                             object_name=os.path.join(source_prefix, source_file),
+                             filename=os.path.join(local_path, source_file))
 
             # Execute task
             func(*args, **kwargs)
@@ -65,11 +63,10 @@ def stage_in_gcs(gcp_conn_id="sandbox-data-pipeline-gcp",
             # Upload files to GCS
             for output_file in output_files:
                 gcs.upload(bucket_name=bucket_name,
-                           object_name=dest_prefix + "/" + output_file,
-                           filename=local_path + "/" + output_file)
+                           object_name=os.path.join(dest_prefix, output_file),
+                           filename=os.path.join(local_path, output_file))
 
         return wrapper
-
     return inner_decorator
 
 
