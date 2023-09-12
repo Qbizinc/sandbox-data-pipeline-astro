@@ -10,7 +10,7 @@ from airflow.operators.empty import EmptyOperator
 from airflow.providers.google.cloud.hooks.gcs import GCSHook
 from airflow.utils.task_group import TaskGroup
 
-from dags.dynamic_dags_utils.factory import Creator
+from factory import Creator
 
 
 def get_vars():

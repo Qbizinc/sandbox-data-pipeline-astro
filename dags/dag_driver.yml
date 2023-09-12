@@ -1,0 +1,90 @@
+dag_metadata:
+  dag_id: my_dynamic_dag_v2
+  params: {'job_id': 'model_run',
+          'trainModel': true,
+           'modelDate': true,
+           'postprocessing': true}
+  # schedule: '@daily'
+  default_args:
+    owner: 'airflow'
+    start_date: '2023-08-29'
+fe_task_group:
+  name: 'fe_working_group'
+  tasks:
+    - task_id: get_data
+      operator: 'PythonOperator'
+      python_module: '01_get_data'
+      python_kwargs: {}
+      depends_on: []
+    - task_id: build_lags_department
+      operator: 'PythonOperator'
+      python_module: '02_build_lag'
+      python_kwargs: {'grp_vars': ['department']}
+      depends_on: [get_data]
+      expand: []
+    - task_id: build_lags_store_department
+      operator: 'PythonOperator'
+      python_module: '02_build_lag'
+      python_kwargs: {'grp_vars': ['store', 'department']}
+      depends_on: [get_data]
+      expand: []
+    - task_id: build_lags_store
+      operator: 'PythonOperator'
+      python_module: '02_build_lag'
+      python_kwargs: {'grp_vars': ['store']}
+      depends_on: [get_data]
+      expand: []
+    - task_id: unify_fe
+      operator: 'PythonOperator'
+      python_module: '03_unify_fe'
+      python_kwargs: {}
+      depends_on: [build_lags_store, build_lags_store_department, build_lags_department]
+training_task_group:
+  name: 'training_task_group'
+  tasks:
+    - task_id: split_data_train_validation
+      operator: 'PythonOperator'
+      python_module: '04_split_data'
+      python_kwargs: {'test_size': 0.2, 'dataset': 'clean_data', 'train_name': 'train_data', 'val_name': 'validation_data', 'target': 'quantity'}
+      depends_on: []
+      expand: []
+    - task_id: split_data_train_test
+      operator: 'PythonOperator'
+      python_module: '04_split_data'
+      python_kwargs: {'test_size': 0.2, 'dataset': 'train_data', 'train_name': 'train_data', 'val_name': 'test_data', 'target': 'quantity'}
+      depends_on: [split_data_train_validation]
+      expand: []
+    - task_id: train_model_xgb
+      operator: 'PythonOperator'
+      python_module: "train_model_xgb"
+      python_kwargs: {'train_name': 'train_data', 'model': 'xgb'}
+      depends_on: [split_data_train_test]
+      expand: [1, 2, 3, 4, 5, 6]
+    - task_id: train_model_lgb
+      operator: 'PythonOperator'
+      python_module: "train_model_lgb"
+      python_kwargs: {'train_name': 'train_data', 'model': 'lgb'}
+      depends_on: [split_data_train_test]
+      expand: [1, 2, 3, 4, 5, 6]
+    - task_id: evaluation
+      operator: 'PythonOperator'
+      python_module: "06_evaluation"
+      python_kwargs: {'train_name': 'train_data', 'val_name': 'validation_data'}
+      depends_on: [train_model_xgb, train_model_lgb, split_data_train_validation]
+      expand: [1, 2, 3, 4, 5, 6]
+inference_task_group:
+  name: 'inference_task_group'
+  tasks:
+    - task_id: infering_data
+      operator: 'PythonOperator'
+      python_module: "07_infering"
+      python_kwargs: {}
+      depends_on: []
+      expand: [1, 2, 3, 4, 5, 6]
+postprocessing_task_group:
+  name: 'postprocessing_task_group'
+  tasks:
+    - task_id: send_to_BI
+      operator: 'BashOperator'
+      command: "echo 'Task Nothing'"
+      depends_on: []
