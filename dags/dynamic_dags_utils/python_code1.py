@@ -4,7 +4,7 @@ from dags.dynamic_dags_utils.utils import stage_in_gcs, get_vars
 @stage_in_gcs(
     source_files=["product.csv", "lineitem.csv", "order.csv"],
     output_files=["data.csv"], )
-def main(**kwargs):
+def main(**_):
     import pandas as pd
 
     vars = get_vars()
