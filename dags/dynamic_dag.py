@@ -15,7 +15,6 @@ across all DAGs owned by DS.
 The DAG takes a boolean parameter, trainModel, which determines whether to run the
 training task group or not.
 """
-
 import yaml
 from airflow import DAG
 from airflow.operators.empty import EmptyOperator
@@ -28,39 +27,31 @@ with open("dags/dynamic_dags_utils/dag_driver.yml", "r", encoding="utf-8") as fh
     dag_info = yaml.safe_load(fh)
 
 metadata = dag_info.pop("dag_metadata")
-metadata["catchup"] = False
 
 with DAG(**metadata) as dag:
-    dag_start = EmptyOperator(task_id="start", dag=dag)
-    dag_end = EmptyOperator(task_id="end", dag=dag)
+
+    dag_start = EmptyOperator(task_id='start', dag=dag)
+    dag_end = EmptyOperator(task_id='end', dag=dag)
 
     build_tasks(dag=dag, task_hierarchy=dag_info)
 
-
     def run_training(params):
         """This function is used to determine whether to run the training task group or not."""
-        if bool(params["trainModel"]):
+        if bool(params['trainModel']):
             print("Training model...")
-            return ["training_task_group.start"]
+            return ['training_task_group.start']
         print("Model training is skipped.")
-        return ["inference_task_group.start"]
-
+        return ['inference_task_group.start']
 
     branching = BranchPythonOperator(
-        task_id="runTrainingBranch", python_callable=run_training, op_kwargs=dag.params
+        task_id='runTrainingBranch',
+        python_callable=run_training,
+        op_kwargs=dag.params
     )
 
-    dag_start >> dag.task_group_dict["fe_task_group"] >> branching
-    (
-            branching
-            >> dag.task_group_dict["training_task_group"]
-            >> dag.task_group_dict["inference_task_group"]
-            >> dag.task_group_dict["postprocessing_task_group"]
-            >> dag_end
-    )
-    (
-            branching
-            >> dag.task_group_dict["inference_task_group"]
-            >> dag.task_group_dict["postprocessing_task_group"]
-            >> dag_end
-    )
+    dag_start >> dag.task_group_dict['fe_task_group'] >> branching
+    branching >> dag.task_group_dict['training_task_group'] >> \
+        dag.task_group_dict['inference_task_group'] >> \
+        dag.task_group_dict['postprocessing_task_group'] >> dag_end
+    branching >> dag.task_group_dict['inference_task_group'] >> \
+        dag.task_group_dict['postprocessing_task_group'] >> dag_end
