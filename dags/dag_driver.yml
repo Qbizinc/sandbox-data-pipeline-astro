@@ -7,7 +7,7 @@ dag_metadata:
   # schedule: '@daily'
   default_args:
     owner: 'airflow'
-    start_date: '2023-08-29'
+    start_date: '2023-09-14'
 fe_task_group:
   name: 'fe_working_group'
   tasks:
@@ -19,19 +19,23 @@ fe_task_group:
     - task_id: build_lags_department
       operator: 'PythonOperator'
       python_module: '02_build_lag'
-      python_kwargs: {'grp_vars': ['department']}
+      python_kwargs: {'grp_vars': ['department'],
+                      'input_files=': ['data.csv'],
+                      'output_files':['department_lag.csv']}
       depends_on: [get_data]
       expand: []
     - task_id: build_lags_store_department
       operator: 'PythonOperator'
       python_module: '02_build_lag'
       python_kwargs: {'grp_vars': ['store', 'department']}
+      output_files: ['store_department_lag.csv']
       depends_on: [get_data]
       expand: []
     - task_id: build_lags_store
       operator: 'PythonOperator'
       python_module: '02_build_lag'
       python_kwargs: {'grp_vars': ['store']}
+      output_files: ['store_lag.csv']
       depends_on: [get_data]
       expand: []
     - task_id: unify_fe
@@ -68,7 +72,7 @@ training_task_group:
       expand: [1, 2, 3, 4, 5, 6]
     - task_id: evaluation
       operator: 'PythonOperator'
-      python_module: "06_evaluation"
+      python_module: "05_evaluation"
       python_kwargs: {'train_name': 'train_data', 'val_name': 'validation_data'}
       depends_on: [train_model_xgb, train_model_lgb, split_data_train_validation]
       expand: [1, 2, 3, 4, 5, 6]
@@ -77,7 +81,7 @@ inference_task_group:
   tasks:
     - task_id: infering_data
       operator: 'PythonOperator'
-      python_module: "07_infering"
+      python_module: "06_infering"
       python_kwargs: {}
       depends_on: []
       expand: [1, 2, 3, 4, 5, 6]

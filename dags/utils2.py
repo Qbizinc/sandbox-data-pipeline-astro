@@ -19,13 +19,53 @@ def get_vars():
     return vars_dict
 
 
+def download_files(gcp_conn_id="sandbox-data-pipeline-gcp",
+                   bucket_name="qbiz-sandbox-data-pipeline",
+                   files=None,
+                   prefix_var=None,
+                   local_path=None,
+                   overwrite=True,):
+    vars = get_vars()
+
+    source_prefix = vars["stage_prefix"] if not prefix_var else vars[prefix_var]
+
+    local_path = local_path or vars["local_path"]
+
+    gcs = GCSHook(gcp_conn_id=gcp_conn_id)
+    for source_file in files:
+        dest_filename = os.path.join(local_path, source_file)
+
+        download_ok = True
+        if overwrite or not os.path.exists(dest_filename):
+            gcs.download(bucket_name=bucket_name,
+                         object_name=os.path.join(source_prefix, source_file),
+                         filename=dest_filename)
+    return local_path
+
+
+def upload_files(gcp_conn_id="sandbox-data-pipeline-gcp",
+                 bucket_name="qbiz-sandbox-data-pipeline",
+                 files=None,
+                 prefix_var=None,
+                 local_path=None, ):
+    vars = get_vars()
+    dest_prefix = vars["stage_prefix"] if not prefix_var else vars[prefix_var]
+    local_path = local_path or vars["local_path"]
+
+    gcs = GCSHook(gcp_conn_id=gcp_conn_id)
+    for output_file in files:
+        gcs.upload(bucket_name=bucket_name,
+                   object_name=os.path.join(dest_prefix, output_file),
+                   filename=os.path.join(local_path, output_file))
+
+
 def stage_in_gcs(gcp_conn_id="sandbox-data-pipeline-gcp",
                  bucket_name="qbiz-sandbox-data-pipeline",
                  source_prefix=None,
                  dest_prefix=None,
                  local_path=None,
                  source_files=None,
-                 output_files=None
+                 output_files=None,
                  ):
     """ Decorator to stage files in GCS before and after task execution.
         gcp_conn_id (str): The connection ID to use when connecting to GCP.
@@ -49,7 +89,6 @@ def stage_in_gcs(gcp_conn_id="sandbox-data-pipeline-gcp",
 
     def inner_decorator(func):
         def wrapper(*args, **kwargs):
-
             # Download files from GCS
             gcs = GCSHook(gcp_conn_id=gcp_conn_id)
             for source_file in source_files:
@@ -67,6 +106,7 @@ def stage_in_gcs(gcp_conn_id="sandbox-data-pipeline-gcp",
                            filename=os.path.join(local_path, output_file))
 
         return wrapper
+
     return inner_decorator
 
 

@@ -1,21 +1,23 @@
-from utils2 import stage_in_gcs, get_vars
+from utils2 import download_files, upload_files
 
 
-@stage_in_gcs(
-    source_files=["product.csv", "lineitem.csv", "order.csv"],
-    output_files=["data.csv"], )
+# @stage_in_gcs(
+#     source_files=["product.csv", "lineitem.csv", "order.csv"],
+#     output_files=["data.csv"], )
 def main(**kwargs):
     import pandas as pd
 
-    vars = get_vars()
-    local_path = vars['local_path']
+    input_files = ["product.csv", "lineitem.csv", "order.csv"]
+    output_files = ["data.csv"]
+    local_path = download_files(files=input_files,
+                                prefix_var="source_prefix")
 
     # Read product catalog
-    product_pd = pd.read_csv(f"{local_path}/product.csv")
+    product_pd = pd.read_csv(f"{local_path}/{input_files[0]}")
     product_pd = product_pd[["p_product_id", "department"]].set_index("p_product_id")
 
     # Read transactional table lineitem
-    lineitem_pd = pd.read_csv(f"{local_path}/lineitem.csv")
+    lineitem_pd = pd.read_csv(f"{local_path}/{input_files[1]}")
     lineitem_pd = lineitem_pd[["li_order_id", "li_product_id", "quantity"]].set_index(
         "li_product_id"
     )
@@ -24,7 +26,7 @@ def main(**kwargs):
     lineitem_pd = lineitem_pd.join(product_pd, how="inner").set_index("li_order_id")
 
     # Read transactional table order
-    order_pd = pd.read_csv(f"{local_path}/order.csv")
+    order_pd = pd.read_csv(f"{local_path}/{input_files[2]}")
     order_pd = order_pd[["o_order_id", "date", "store"]].set_index("o_order_id")
 
     # Join order with lineitem to identify the quantity of each order
@@ -64,4 +66,5 @@ def main(**kwargs):
     )
 
     # save data_pd
-    data_pd.to_csv(f"{local_path}/data.csv", index=False)
+    data_pd.to_csv(f"{local_path}/{output_files[0]}", index=False)
+    upload_files(files=output_files)
